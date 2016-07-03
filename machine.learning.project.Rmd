@@ -1,0 +1,129 @@
+---
+title: "machine.learning.project"
+output: html_document
+keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+####K.Y.
+####2016-06-30
+
+## Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+##Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment. 
+
+## Goal
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+
+```{r}
+library(ggplot2)
+library(caret)
+library(randomForest)
+```
+
+###Downloading and Reading Data
+Download the given source files
+```{r}
+if(file.exists("training.csv")==FALSE){
+trainurl<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+download.file(trainurl,destfile = "training.csv",method="curl")}
+
+if(file.exists("testing.csv")==FALSE){
+testurl<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(testurl,destfile = "testing.csv",method="curl")}
+```
+
+Read the downloaded files
+```{r}
+
+training1<-read.csv("training.csv",header = TRUE,na.strings = c("NA","#DIV/0!"))
+testing1<-read.csv("testing.csv",header = TRUE,na.strings = c("NA","#DIV/0!"))
+nrow(training1)
+ncol(training1)
+nrow(testing1)
+ncol(testing1)
+summary(training1$classe)
+```
+Based on the above, there are 160 factors which we could use for the prediction. However, we would ONLY use some of them without any missing values. 
+
+For the training classe, we could summarize that class A are the most common type.
+
+###Cleaning Dataset
+Now we are going to elimate those missing values and remove the first 6 elements becasuse they are not numeric (i.e. Time series)
+```{r}
+training2<-training1[,apply(training1,2,function(i) !any(is.na(i)))]
+training2<-training2[,-c(1:6)]
+
+testing2<-testing1[,apply(training1,2, function(i) !any(is.na(i)))]
+testing2<-testing2[,-c(1:6)]
+
+dim(training2)
+dim(testing2)
+```
+
+###Partitioning dataset
+Now we are going to make partition for the data set which will be splitted into 2 parts (60% Training set; 40% Testing set) based on the guidline from the Practical Machine Learning course.
+
+```{r}
+set.seed(13579)
+
+inTrain<-createDataPartition(training2$classe,p=0.6,list=FALSE)
+training3<-training2[inTrain,]
+testing3<-training2[-inTrain,]
+dim(training3)
+dim(testing3)
+```
+
+###Forming Decision Tree Model
+```{r}
+library(rpart)
+library(rpart.plot)
+fitModel<-rpart(classe~.,data=training3,method="class")
+rpart.plot(fitModel)
+```
+
+### Predicting Decision tree Model
+```{r}
+set.seed(13579)
+predict.1<-predict(fitModel,testing3,type="class")
+confusionMatrix(predict.1,testing3$classe)$overall[1]
+```
+
+Based on the above result, the accuracy of the prediction of decision tree is NOT acceptable.
+
+###Forming Random Forest Model
+```{r}
+set.seed(13579)
+fitModel2<-randomForest(classe ~ ., data = training3)
+```
+
+### Predicting Random Forest Model
+```{r}
+set.seed(13579)
+predict.2<-predict(fitModel2,testing3,type="class")
+confusionMatrix(predict.2,testing3$classe)$overall[1]
+```
+
+Based on the above result, the prediction of Random Forest Model which is 99.64% is highly accurate. For this reason, we will use this method to predict the test part of the original data set.
+
+###Predicting the original testing data Set
+```{r}
+predict.3<-predict(fitModel2,testing1,type="class")
+predict.3
+```
+
+Based on the above result, the prediction was very accurate and the submission turns out 20/20 accuracy.
+
